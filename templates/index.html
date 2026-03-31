@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Smart Air Quality Prediction System</title>
+    <!-- Premium UI CSS linking -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header>
+        <h1>Smart Air Quality Prediction</h1>
+        <div class="nav-links">
+            {% if session.get('user_id') %}
+                <span>Welcome, {{ session.get('user_name') }}!</span>
+                <a href="{{ url_for('logout') }}" class="btn-primary" style="margin-left: 1rem; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3);">Logout</a>
+            {% else %}
+                <a href="{{ url_for('login') }}">Login</a>
+                <a href="{{ url_for('register') }}" class="btn-primary">Register</a>
+            {% endif %}
+        </div>
+    </header>
+    
+    <main>
+        <div class="flash-messages">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="flash-message flash-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        <div class="dashboard">
+            <h2>Welcome to Data Insights</h2>
+            {% if session.get('user_id') %}
+                <p>You are logged in securely. The Air Quality analytics will be displayed here soon.</p>
+            {% else %}
+                <p>Please <a href="{{ url_for('login') }}" style="color: #4facfe;">log in</a> or <a href="{{ url_for('register') }}" style="color: #4facfe;">register</a> to access the full Air Quality dashboard and predictions.</p>
+            {% endif %}
+        </div>
+    </main>
+
+    <!-- Placeholder for JS linking -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

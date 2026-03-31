@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Smart AQI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <style>
+        /* OVERRIDE dashboard.css overflow: hidden to force scrolling */
+        body {
+            height: auto !important;
+            overflow: auto !important;
+            min-height: 100vh;
+            background-color: var(--bg-main);
+        }
+        
+        .main-content {
+            overflow-y: visible !important; /* Let body scroll instead */
+            height: auto !important;
+        }
+
+        .role-badge {
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .role-admin { background: var(--danger-bg); color: var(--danger); }
+        .role-user { background: var(--success-bg); color: var(--success); }
+        
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .admin-table th {
+            text-align: left;
+            padding: 14px 16px;
+            background: #f8fafc;
+            border-bottom: 2px solid var(--border-color);
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .admin-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-main);
+            font-size: 0.9rem;
+        }
+        
+        .scroll-container {
+            max-height: 400px; 
+            overflow-y: auto; 
+            border-radius: 12px; 
+            border: 1px solid var(--border-color);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+            background: white;
+        }
+        
+        /* Sticky header for tables */
+        .admin-table thead {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <div class="brand">
+                <div class="brand-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    </svg>
+                </div>
+                <span>Admin Panel</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="user-profile">
+                <img src="https://ui-avatars.com/api/?name={{ session.get('user_name', 'Admin') }}&background=6366f1&color=fff" alt="Profile">
+                <div class="user-info">
+                    <span class="user-name">{{ session.get('user_name') }}</span>
+                    <span class="user-role">Administrator</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="layout">
+        <aside class="sidebar">
+            <nav class="sidebar-nav">
+                <ul class="nav-list">
+                    <li class="nav-item">
+                        <a href="{{ url_for('admin') }}" class="nav-link active">
+                            <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="7" height="9"></rect>
+                                <rect x="14" y="3" width="7" height="5"></rect>
+                                <rect x="14" y="12" width="7" height="9"></rect>
+                                <rect x="3" y="16" width="7" height="5"></rect>
+                            </svg>
+                            <span>Admin Center</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ url_for('index') }}" class="nav-link">
+                            <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                            </svg>
+                            <span>Back to Apps</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="{{ url_for('logout') }}" class="nav-link logout">
+                    <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                    <span>Logout</span>
+                </a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="page-header">
+                <div>
+                    <h1 class="page-title">System Overview</h1>
+                    <p class="page-subtitle">Platform health and user activity management</p>
+                </div>
+            </div>
+
+            <!-- Stats Overview -->
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="card-header"><span class="card-title">Total Registered Users</span></div>
+                    <div class="card-value">{{ users|length }}</div>
+                    <div class="card-trend neutral"><span>Growth metrics active</span></div>
+                </div>
+                <div class="metric-card">
+                    <div class="card-header"><span class="card-title">Total Search History</span></div>
+                    <div class="card-value">{{ history|length }}</div>
+                    <div class="card-trend neutral"><span>Query volume monitored</span></div>
+                </div>
+                {% if metrics %}
+                <div class="metric-card" style="border-bottom: 4px solid var(--success);">
+                    <div class="card-header"><span class="card-title">Model Accuracy Score</span></div>
+                    <div class="card-value" style="color: var(--success);">{{ metrics.accuracy_percentage|round(1) }}%</div>
+                    <div class="card-trend positive">
+                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        <span>Highly Reliable</span>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Model Insights -->
+            {% if metrics %}
+            <div class="chart-container" style="border-left: 4px solid var(--primary-color); background: linear-gradient(to right, #ffffff, #f8fafc);">
+                <div class="chart-header">
+                    <h3 style="display: flex; align-items: center; gap: 10px;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                        Model Accuracy & Performance
+                    </h3>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 32px;">
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <div style="display: flex; justify-content: space-between; padding: 12px; background: white; border-radius: 10px; border: 1px solid var(--border-color);">
+                            <span style="color: var(--text-muted); font-weight: 500;">Architecture</span>
+                            <span style="font-weight: 600; color: var(--primary-color);">{{ metrics.model_type }}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 12px; background: white; border-radius: 10px; border: 1px solid var(--border-color);">
+                            <span style="color: var(--text-muted); font-weight: 500;">Mean Absolute Error (MAE)</span>
+                            <span style="font-weight: 600;">{{ metrics.mae }}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 12px; background: white; border-radius: 10px; border: 1px solid var(--border-color);">
+                            <span style="color: var(--text-muted); font-weight: 500;">RMSE</span>
+                            <span style="font-weight: 600;">{{ metrics.rmse }}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 12px; background: white; border-radius: 10px; border: 1px solid var(--border-color);">
+                            <span style="color: var(--text-muted); font-weight: 500;">Confidence (R²)</span>
+                            <span style="font-weight: 600; color: var(--success);">{{ metrics.r2_score }}</span>
+                        </div>
+                    </div>
+                    <div style="background: white; border: 1px solid var(--border-color); border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; box-shadow: var(--shadow-sm);">
+                        <div style="position: relative; width: 140px; height: 140px; display: flex; align-items: center; justify-content: center;">
+                            <!-- Progress Ring Style SVG -->
+                            <svg width="140" height="140" viewBox="0 0 140 140">
+                                <circle cx="70" cy="70" r="60" fill="none" stroke="#f1f5f9" stroke-width="12" />
+                                <circle cx="70" cy="70" r="60" fill="none" stroke="var(--success)" stroke-width="12" 
+                                        stroke-dasharray="377" stroke-dashoffset="{{ 377 - (377 * (metrics.accuracy_percentage / 100)) }}" 
+                                        stroke-linecap="round" transform="rotate(-90 70 70)" />
+                            </svg>
+                            <div style="position: absolute; font-weight: 800; font-size: 1.75rem; color: var(--text-main);">
+                                {{ metrics.accuracy_percentage|round(0) }}%
+                            </div>
+                        </div>
+                        <p style="margin-top: 16px; font-weight: 700; color: var(--text-main);">Intelligence Reliability</p>
+                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Last evaluated: {{ metrics.last_evaluated }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Registered Users Table -->
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h3>User Directory</h3>
+                </div>
+                <div class="scroll-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr>
+                                <td>{{ user.id }}</td>
+                                <td style="font-weight: 600;">{{ user.name }}</td>
+                                <td style="color: var(--text-muted);">{{ user.email }}</td>
+                                <td>
+                                    <span class="role-badge role-{{ user.role }}">{{ user.role }}</span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Search Activity -->
+            <div class="chart-container">
+                <div class="chart-header">
+                    <h3>Global Search Activity</h3>
+                </div>
+                <div class="scroll-container" style="max-height: 500px;">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Location</th>
+                                <th>AQI</th>
+                                <th>AI Forecast</th>
+                                <th>Timestamp</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entry in history %}
+                            <tr>
+                                <td><span style="font-weight: 600;">UID #{{ entry.user_id }}</span></td>
+                                <td style="font-weight: 500;">{{ entry.city }}</td>
+                                <td><span style="background: var(--bg-main); padding: 4px 8px; border-radius: 6px; font-weight: 700;">{{ entry.aqi }}</span></td>
+                                <td>
+                                    {% if entry.predicted_aqi %}
+                                    <span style="color: var(--primary-color); font-weight: bold;">{{ "%.1f"|format(entry.predicted_aqi) }}</span>
+                                    {% else %}
+                                    <span style="color: var(--text-muted);">--</span>
+                                    {% endif %}
+                                </td>
+                                <td style="font-size: 0.8rem; color: var(--text-muted);">{{ entry.search_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <span>&copy; 2026 Admin Dashboard - Secure Access</span>
+            <div class="footer-links">
+                <span class="badge" style="position: relative; background: var(--success); color: white; padding: 4px 12px; border-radius: 6px; font-size: 10px; border: none;">SYSTEM LIVE</span>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

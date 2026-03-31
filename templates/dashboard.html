@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Air Quality Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <!-- Added simple inline styles for loading state & search bar compatibility -->
+    <style>
+        .search-container {
+            display: flex; gap: 8px; margin-right: 16px;
+        }
+        .city-input {
+            padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border-color);
+            outline: none; font-family: 'Inter', sans-serif; font-size: 0.95rem;
+            width: 250px; background-color: var(--bg-card);
+        }
+        .btn-search {
+            background-color: var(--primary-color); color: white; border: none;
+            padding: 8px 20px; border-radius: 8px; font-weight: 500; cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-search:hover { background-color: var(--primary-hover); }
+        .spinner {
+            display: none; border: 3px solid rgba(255,255,255,0.3); border-radius: 50%;
+            border-top: 3px solid white; width: 14px; height: 14px; animation: spin 1s linear infinite; margin-left: 8px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* Error Alert Banner */
+        .api-error-banner {
+            display: none; background-color: var(--danger-bg); color: var(--danger);
+            padding: 12px 16px; border-radius: 8px; border: 1px solid var(--danger);
+            margin-bottom: 24px; font-weight: 500; font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <button class="hamburger" onclick="toggleSidebar()" aria-label="Toggle Navigation">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+            </button>
+            <div class="brand">
+                <div class="brand-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"></path>
+                    </svg>
+                </div>
+                <span>AirSense AQI</span>
+            </div>
+        </div>
+
+        <div class="header-right">
+            <!-- Search Bar integrated directly into header for modern look -->
+            <div class="search-container">
+                <input type="text" id="cityInput" class="city-input" placeholder="Search City (e.g., London)" onkeypress="if(event.key === 'Enter') checkAirQuality()">
+                <button onclick="checkAirQuality()" class="btn-search" id="searchBtn">
+                    Check
+                    <span class="spinner" id="searchSpinner"></span>
+                </button>
+            </div>
+            <div class="user-profile">
+                <!-- Using session values for dynamic injection if users are logged in -->
+                <img src="https://ui-avatars.com/api/?name={{ session.get('user_name', 'User') }}&background=3b82f6&color=fff&rounded=true" alt="Profile">
+                <div class="user-info">
+                    <span class="user-name">{{ session.get('user_name', 'Guest User') }}</span>
+                    <span class="user-role">Member</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="layout">
+        <aside class="sidebar" id="sidebar">
+            <nav class="sidebar-nav">
+                <ul class="nav-list">
+                    <li class="nav-item">
+                        <a href="#" class="nav-link active" id="nav-dashboard" onclick="switchTab('dashboard')">
+                            <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="7" height="9"></rect>
+                                <rect x="14" y="3" width="7" height="5"></rect>
+                                <rect x="14" y="12" width="7" height="9"></rect>
+                                <rect x="3" y="16" width="7" height="5"></rect>
+                            </svg>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" id="nav-history" onclick="switchTab('history')">
+                            <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="12 8 12 12 14 14"></polyline>
+                                <circle cx="12" cy="12" r="10"></circle>
+                            </svg>
+                            <span>History</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="{{ url_for('logout') }}" class="nav-link logout">
+                    <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                    <span>Logout</span>
+                </a>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <!-- Normal Dashboard Views -->
+            <div id="dashboard-view">
+                <div class="page-header">
+                    <div>
+                    <h1 class="page-title" id="location-title">Enter a City</h1>
+                    <p class="page-subtitle" id="location-subtitle">Search for a city above to fetch real-time air pollution data.</p>
+                </div>
+                <div class="date-picker">
+                    <span id="current-date">Fetching Date...</span>
+                </div>
+            </div>
+
+            <div id="apiErrorBanner" class="api-error-banner"></div>
+
+            <!-- Health Protection Recommendations Banner -->
+            <div id="health-advice-container" style="display: none; background-color: var(--bg-card); border-left: 4px solid var(--primary-color); padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                    <div style="background-color: var(--primary-color); color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-weight: bold;">+</div>
+                    <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-main);">Health Recommendations</h3>
+                </div>
+                <p id="health-advice-text" style="margin: 0 0 4px 40px; color: var(--text-light); line-height: 1.5; font-size: 0.95rem;"></p>
+                <p id="future-advice-text" style="margin: 0 0 0 40px; color: var(--text-light); line-height: 1.5; font-style: italic; font-size: 0.9rem; border-top: 1px solid var(--border-color); padding-top: 8px; margin-top: 8px;"></p>
+            </div>
+
+            <!-- AI Trend Chart Box -->
+            <div id="chart-container" style="display: none; background-color: var(--bg-card); padding: 16px; border-radius: 8px; margin-bottom: 24px;">
+                <h3 style="margin: 0 0 16px 0; font-size: 1.1rem; color: var(--text-main);">Historical AQI Trend & AI Forecast</h3>
+                <div style="position: relative; height: 260px; width: 100%;">
+                    <canvas id="aqiChart"></canvas>
+                </div>
+            </div>
+
+            <div class="metrics-grid">
+                <!-- AQI Status Main Card -->
+                <div class="metric-card">
+                    <div class="card-header">
+                        <span class="card-title">Air Quality Index</span>
+                        <div class="status-indicator neutral" id="aqi-badge">N/A</div>
+                    </div>
+                    <div class="card-value" id="aqi-value" style="font-size: 3rem;">--</div>
+                    <div class="card-trend neutral" id="aqi-msg">
+                        <span id="aqi-desc">Awaiting search</span>
+                    </div>
+                </div>
+                <!-- AI Forecast Alert Card -->
+                <div class="metric-card" id="forecast-card" style="border: 2px solid transparent; transition: border-color 0.3s;">
+                    <div class="card-header">
+                        <span class="card-title" style="font-weight: 600;">Forecast (Tomorrow)</span>
+                        <div class="status-indicator neutral" id="pred-badge">N/A</div>
+                    </div>
+                    <div class="card-value" id="pred-value" style="font-size: 3rem;">--</div>
+                    <div class="card-trend neutral" id="pred-msg">
+                        <span id="pred-desc">Awaiting AI evaluation</span>
+                    </div>
+                </div>
+                <!-- PM2.5 -->
+                <div class="metric-card">
+                    <div class="card-header"><span class="card-title">PM2.5</span></div>
+                    <div class="card-value"><span id="val-pm25">--</span> <span class="unit">µg/m³</span></div>
+                    <div class="card-trend neutral"><span>Fine Particles</span></div>
+                </div>
+                <!-- PM10 -->
+                <div class="metric-card">
+                    <div class="card-header"><span class="card-title">PM10</span></div>
+                    <div class="card-value"><span id="val-pm10">--</span> <span class="unit">µg/m³</span></div>
+                    <div class="card-trend neutral"><span>Coarse Particles</span></div>
+                </div>
+                <!-- NO2 -->
+                <div class="metric-card">
+                    <div class="card-header"><span class="card-title">NO₂</span></div>
+                    <div class="card-value"><span id="val-no2">--</span> <span class="unit">µg/m³</span></div>
+                    <div class="card-trend neutral"><span>Nitrogen Dioxide</span></div>
+                </div>
+                <!-- O3 -->
+                 <div class="metric-card">
+                    <div class="card-header"><span class="card-title">O₃</span></div>
+                    <div class="card-value"><span id="val-o3">--</span> <span class="unit">µg/m³</span></div>
+                    <div class="card-trend neutral"><span>Ozone</span></div>
+                </div>
+                 <!-- CO -->
+                 <div class="metric-card">
+                    <div class="card-header"><span class="card-title">CO</span></div>
+                    <div class="card-value"><span id="val-co">--</span> <span class="unit">µg/m³</span></div>
+                    <div class="card-trend neutral"><span>Carbon Monoxide</span></div>
+                </div>
+            </div>
+            </div>
+
+            <!-- History View Panel -->
+            <div id="history-view" style="display: none;">
+                <div class="page-header">
+                    <div>
+                        <h1 class="page-title">Search History</h1>
+                        <p class="page-subtitle">A historical log of your past predictions.</p>
+                    </div>
+                    <button class="btn btn-outline" onclick="switchTab('dashboard')" style="display: flex; align-items: center; gap: 8px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="19" y1="12" x2="5" y2="12"></line>
+                            <polyline points="12 19 5 12 12 5"></polyline>
+                        </svg>
+                        <span>Back to Dashboard</span>
+                    </button>
+                </div>
+                
+                <div style="background-color: var(--bg-card); border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); margin-bottom: 24px;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                        <thead style="background-color: var(--primary-color); color: white;">
+                            <tr>
+                                <th style="padding: 12px 16px;">Date & Time</th>
+                                <th style="padding: 12px 16px;">City</th>
+                                <th style="padding: 12px 16px;">Recorded AQI</th>
+                                <th style="padding: 12px 16px;">AI Predicted AQI</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body">
+                            <!-- JS Injection -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div style="height: 50px;"></div> 
+        </main>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <p>&copy; 2026 Smart Air Quality Prediction System. Powered by OpenWeatherMap.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Set dynamic date
+        const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.getElementById('current-date').textContent = new Date().toLocaleDateString('en-US', dateOptions);
+
+        let aqiChartInstance = null;
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+            if (tabId === 'dashboard') {
+                document.getElementById('nav-dashboard').classList.add('active');
+                document.getElementById('dashboard-view').style.display = 'block';
+                document.getElementById('history-view').style.display = 'none';
+            } else if (tabId === 'history') {
+                document.getElementById('nav-history').classList.add('active');
+                document.getElementById('dashboard-view').style.display = 'none';
+                document.getElementById('history-view').style.display = 'block';
+                loadHistory();
+            }
+        }
+        
+        async function loadHistory() {
+            const tbody = document.getElementById('history-table-body');
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 20px;">Fetching History...</td></tr>';
+            
+            try {
+                const response = await fetch('/api/history');
+                const result = await response.json();
+                
+                if (result.success && result.data.length > 0) {
+                    tbody.innerHTML = '';
+                    result.data.forEach(item => {
+                        const tr = document.createElement('tr');
+                        tr.style.borderBottom = '1px solid var(--border-color)';
+                        
+                        tr.innerHTML = `
+                            <td style="padding: 14px 16px; color: var(--text-light); font-size: 0.9rem;">${item.date}</td>
+                            <td style="padding: 14px 16px; font-weight: 500;">${item.city}</td>
+                            <td style="padding: 14px 16px; font-weight: bold;">${item.aqi || '--'}</td>
+                            <td style="padding: 14px 16px; color: var(--info); font-weight: bold;">${item.predicted_aqi ? item.predicted_aqi.toFixed(1) : '--'}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                     tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 20px; color: var(--text-light);">No search history found. Start searching!</td></tr>';
+                }
+            } catch (err) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 20px; color: var(--danger);">Failed to load history.</td></tr>';
+            }
+        }
+
+        async function checkAirQuality() {
+            const cityInput = document.getElementById('cityInput').value.trim();
+            const errorBanner = document.getElementById('apiErrorBanner');
+            const searchBtn = document.getElementById('searchBtn');
+            const spinner = document.getElementById('searchSpinner');
+            
+            // Client-side validation
+            if (!cityInput) {
+                showError("Please enter a city name to search.");
+                return;
+            }
+            
+            // Reset state & Show loading message
+            errorBanner.style.display = 'none';
+            searchBtn.disabled = true;
+            spinner.style.display = 'inline-block';
+            
+            document.getElementById('location-title').textContent = "Loading data...";
+            document.getElementById('location-subtitle').textContent = "Fetching latest metrics from OpenWeatherMap...";
+            document.getElementById('aqi-value').textContent = "--";
+            document.getElementById('pred-value').textContent = "--";
+            document.getElementById('pred-badge').textContent = "Predicting...";
+            document.getElementById('pred-badge').className = "status-indicator neutral";
+            document.getElementById('forecast-card').style.borderColor = "transparent";
+            document.getElementById('val-pm25').textContent = "--";
+            document.getElementById('val-pm10').textContent = "--";
+            document.getElementById('val-no2').textContent = "--";
+            document.getElementById('val-o3').textContent = "--";
+            document.getElementById('val-co').textContent = "--";
+            document.getElementById('health-advice-container').style.display = 'none';
+            document.getElementById('chart-container').style.display = 'none';
+            
+            try {
+                // Fetch dynamically bypassing page-reload
+                const response = await fetch(`/api/air-quality?city=${encodeURIComponent(cityInput)}`);
+                
+                // Handle API Server Failure
+                if (!response.ok) {
+                    let errText = "Unexpected Server Error";
+                    try {
+                        const errData = await response.json();
+                        errText = errData.error || errText;
+                    } catch(e) {}
+                    
+                    // Show alert if city not found
+                    if (errText.toLowerCase().includes('not found')) {
+                        alert(`City "${cityInput}" could not be found. Please check your spelling.`);
+                    }
+                    throw new Error(errText);
+                }
+                
+                const result = await response.json();
+                
+                // Handle Graceful Backend rejections
+                if (!result.success) {
+                    if (result.error && result.error.toLowerCase().includes('not found')) {
+                        alert(`City "${cityInput}" could not be found. Please check your spelling.`);
+                    }
+                    throw new Error(result.error || "Failed to fetch air quality data");
+                }
+                
+                // Update UI upon successful API fetch
+                updateDashboardUI(result.data);
+                
+            } catch (err) {
+                showError(err.message);
+                document.getElementById('location-title').textContent = "Search Failed";
+                document.getElementById('location-subtitle').textContent = "Please try again.";
+            } finally {
+                searchBtn.disabled = false;
+                spinner.style.display = 'none';
+            }
+        }
+        
+        function showError(message) {
+            const errorBanner = document.getElementById('apiErrorBanner');
+            errorBanner.textContent = message;
+            errorBanner.style.display = 'block';
+        }
+
+        function updateDashboardUI(data) {
+            // Update Location Info
+            document.getElementById('location-title').textContent = `${data.location.city}, ${data.location.country}`;
+            document.getElementById('location-subtitle').textContent = `Coords: [${data.location.lat.toFixed(4)}, ${data.location.lon.toFixed(4)}]`;
+            
+            // Update Main AQI Card
+            document.getElementById('aqi-value').textContent = data.aqi;
+            const badge = document.getElementById('aqi-badge');
+            badge.textContent = data.status;
+            badge.className = `status-indicator ${data.css_class}`;
+            
+            document.getElementById('aqi-msg').className = `card-trend ${data.css_class}`;
+            document.getElementById('aqi-desc').textContent = `Current status is ${data.status}`;
+            
+            // Update Pollutant Values
+            document.getElementById('val-pm25').textContent = data.pollutants.pm2_5;
+            document.getElementById('val-pm10').textContent = data.pollutants.pm10;
+            document.getElementById('val-no2').textContent = data.pollutants.no2;
+            document.getElementById('val-o3').textContent = data.pollutants.o3;
+            document.getElementById('val-co').textContent = data.pollutants.co;
+            
+            // Evaluated AI Forecast Alerts
+            const forecastCard = document.getElementById('forecast-card');
+            
+            if (data.predicted_aqi !== null) {
+                document.getElementById('pred-value').textContent = data.predicted_aqi;
+                
+                const predBadge = document.getElementById('pred-badge');
+                predBadge.textContent = data.predicted_status;
+                predBadge.className = `status-indicator ${data.predicted_class}`;
+                
+                document.getElementById('pred-msg').className = `card-trend ${data.predicted_class}`;
+                
+                if (data.predicted_class === 'danger') {
+                    document.getElementById('pred-desc').textContent = "⚠️ High Alert: Dangerous Air Quality forecasted.";
+                    forecastCard.style.borderColor = "var(--danger)";
+                    forecastCard.style.backgroundColor = "var(--danger-bg)";
+                } else if (data.predicted_class === 'warning') {
+                    document.getElementById('pred-desc').textContent = "⚠️ Alert: Elevated pollution expected.";
+                    forecastCard.style.borderColor = "var(--warning)";
+                    forecastCard.style.backgroundColor = "var(--warning-bg)";
+                } else {
+                    document.getElementById('pred-desc').textContent = "Air quality levels expected to be stable.";
+                    forecastCard.style.borderColor = "var(--success)";
+                    forecastCard.style.backgroundColor = "transparent";
+                }
+            } else {
+                document.getElementById('pred-value').textContent = "N/A";
+                const predBadge = document.getElementById('pred-badge');
+                
+                if (data.prediction_available === false) {
+                    predBadge.textContent = "Model Unavailable";
+                    document.getElementById('pred-desc').textContent = "AI prediction engine could not be loaded.";
+                } else {
+                    predBadge.textContent = "No Forecast";
+                    document.getElementById('pred-desc').textContent = "Historical data for this city is incomplete.";
+                }
+                predBadge.className = "status-indicator neutral";
+                forecastCard.style.borderColor = "transparent";
+                forecastCard.style.backgroundColor = "transparent";
+            }
+            
+            // Render Health Protections
+            const healthContainer = document.getElementById('health-advice-container');
+            if (data.recommendation) {
+                healthContainer.style.display = 'block';
+                document.getElementById('health-advice-text').textContent = `Current: ${data.recommendation}`;
+                
+                const futureText = document.getElementById('future-advice-text');
+                if (data.predicted_recommendation) {
+                    futureText.style.display = 'block';
+                    futureText.textContent = `AI Forecast: ${data.predicted_recommendation}`;
+                } else {
+                    futureText.style.display = 'none';
+                }
+            } else {
+                healthContainer.style.display = 'none';
+            }
+            
+            // Render Trend Chart
+            renderChart(data.historical_aqi, data.aqi, data.predicted_aqi);
+        }
+        
+        function renderChart(historical, current, predicted) {
+            document.getElementById('chart-container').style.display = 'block';
+            const ctx = document.getElementById('aqiChart').getContext('2d');
+            
+            if (aqiChartInstance) {
+                aqiChartInstance.destroy();
+            }
+            
+            let labels = [];
+            let dataPoints = [];
+            
+            if (historical && historical.length > 0) {
+                // Backward count for historical labels (-7, -6, etc)
+                for(let i= historical.length; i > 0; i--) {
+                    labels.push(`Day -${i}`);
+                }
+                dataPoints = [...historical];
+            }
+            
+            labels.push('Today');
+            dataPoints.push(current);
+            
+            if (predicted !== null) {
+                labels.push('Tomorrow (AI)');
+                dataPoints.push(predicted);
+            }
+            
+            aqiChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Air Quality Index',
+                        data: dataPoints,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                        pointBackgroundColor: dataPoints.map((val, idx) => idx === dataPoints.length - 1 && predicted !== null ? '#ef4444' : '#3b82f6'),
+                        pointRadius: dataPoints.map((val, idx) => idx === dataPoints.length - 1 && predicted !== null ? 6 : 4)
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            suggestedMax: Math.max(...dataPoints, 5) + 1
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

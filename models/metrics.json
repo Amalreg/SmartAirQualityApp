@@ -1,0 +1,9 @@
+{
+    "mae": 38.03,
+    "rmse": 51.17,
+    "r2_score": 0.7734,
+    "accuracy_percentage": 81.15,
+    "last_evaluated": "2026-03-31 18:50",
+    "model_type": "Bidirectional Stacked LSTM",
+    "window_size": 7
+}
