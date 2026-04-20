@@ -44,6 +44,19 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+# ------------------ NO-CACHE HEADERS ------------------
+@app.after_request
+def add_header(response):
+    """
+    Force the browser to NOT cache pages. This ensures that
+    if the user logs out and clicks the 'Back' button, 
+    they will be redirected to login instead of seeing the dashboard.
+    """
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
 # ------------------ AQI CONVERSION ------------------
 def convert_api_aqi(api_aqi):
     """
@@ -215,6 +228,11 @@ def api_history():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    # Redirect if already logged in
+    if 'user_id' in session:
+        if session.get('role') == 'admin':
+            return redirect(url_for('admin'))
+        return redirect(url_for('index'))
 
     if request.method == 'POST':
 
@@ -239,6 +257,11 @@ def register():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # Redirect if already logged in
+    if 'user_id' in session:
+        if session.get('role') == 'admin':
+            return redirect(url_for('admin'))
+        return redirect(url_for('index'))
 
     if request.method == 'POST':
 
@@ -298,6 +321,33 @@ def admin():
             
     return render_template('admin.html', users=users, history=history, metrics=metrics)
 
+@app.route('/admin/delete-user/<int:user_id>', methods=['POST'])
+@login_required
+def delete_user(user_id):
+    if session.get('role') != 'admin':
+        flash("Unauthorized access!", "danger")
+        return redirect(url_for('index'))
+
+    # Prevent deleting self
+    if user_id == session.get('user_id'):
+        flash("You cannot delete your own admin account!", "warning")
+        return redirect(url_for('admin'))
+
+    user = User.query.get(user_id)
+    if not user:
+        flash("User not found.", "danger")
+        return redirect(url_for('admin'))
+
+    try:
+        db.session.delete(user)
+        db.session.commit()
+        flash(f"User {user.name} ({user.email}) deleted.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error during deletion: {e}", "danger")
+
+    return redirect(url_for('admin'))
+
 @app.route('/logout')
 def logout():
     session.clear()
@@ -306,4 +356,5 @@ def logout():
 # ------------------ RUN ------------------
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # DO NOT REMOVE: host='0.0.0.0' is REQUIRED for your AWS deployment to be visible
+    app.run(host='0.0.0.0', port=5000, debug=True)

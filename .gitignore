@@ -1,6 +1,27 @@
-venv/
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+
+# Virtual Environments
 .env
-models/*.keras
-models/*.h5
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project Specific
+instance/
+.ipynb_checkpoints/
+*.log
+
+# Large ML Models (Uncomment if file is over 100MB)
+# models/*.keras

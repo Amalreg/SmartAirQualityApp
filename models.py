@@ -33,5 +33,5 @@ class SearchHistory(db.Model):
     predicted_aqi = db.Column(db.Float, nullable=True)
     search_date = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Automatically map the relationship backwards so User.searches calls all searches gracefully
-    user = db.relationship('User', backref=db.backref('searches', lazy=True))
+    # Automatically map the relationship backwards with cascading delete
+    user = db.relationship('User', backref=db.backref('searches', lazy=True, cascade='all, delete-orphan'))
